@@ -11,8 +11,10 @@ namespace IvyPaymentPlugin\Service;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Cookie\CookieJar;
-use GuzzleHttp\Message\ResponseInterface;
+use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\RequestOptions;
 use IvyPaymentPlugin\Components\IvyJsonResponse;
+use Psr\Http\Message\ResponseInterface;
 use Shopware\Components\Routing\Router;
 use Shopware\Models\Shop\Shop;
 use Symfony\Component\HttpFoundation\Request;
@@ -43,7 +45,7 @@ class StoreProxy
      * @param Request $request
      * @param $swContextToken
      * @return ResponseInterface
-     * @throws \Exception
+     * @throws GuzzleException
      */
     public function proxy(Request $request, $swContextToken)
     {
@@ -58,24 +60,15 @@ class StoreProxy
         $cookieJar = CookieJar::fromArray(\json_decode(\base64_decode($swContextToken), true), $this->shop->getHost());
         $options = [
             'cookies' => $cookieJar,
-            'headers' => $request->headers->all(),
+            RequestOptions::HEADERS => $request->headers->all(),
         ];
         $params = $request->request->all();
         if (!empty($params)) {
-            $options['form_params'] = $params;
+            $options[RequestOptions::FORM_PARAMS] = $params;
         } elseif (!empty((string)$request->getContent())) {
-            $options['body'] = (string)$request->getContent();
+            $options[RequestOptions::BODY] = (string)$request->getContent();
         }
-        switch ($request->getMethod()) {
-            case 'GET':
-                $response = $client->get($url, $options);
-                break;
-            case 'POST':
-                $response = $client->post($url, $options);
-                break;
-            default:
-                throw new \Exception('method not supported ' . $request->getMethod());
-        }
+        $response = $client->request($request->getMethod(), $url, $options);
 
         $decoded = \json_decode($response->getBody(), true);
 
@@ -84,7 +77,7 @@ class StoreProxy
             if ($request->isSecure()) {
                 $url = \str_replace('http:', 'https:', $url);
             }
-            return $client->post($url, $options);
+            return $client->request('POST', $url, $options);
         }
         return $response;
     }

@@ -171,14 +171,11 @@ class Shopware_Controllers_Frontend_IvyProxy extends Shopware_Controllers_Fronte
                         $sDispatches = $this->getDispatches($paymentId);
                         foreach ($sDispatches as $dispatch) {
                             $countries = $this->em->getConnection()
-                                ->fetchAll('SELECT c.countryiso FROM `s_premium_dispatch_countries` dc INNER JOIN s_core_countries c ON c.id = dc.countryID WHERE c.active = 1 AND dc.dispatchID = :dispatchID',
+                                ->fetchFirstColumn('SELECT c.countryiso FROM `s_premium_dispatch_countries` dc INNER JOIN s_core_countries c ON c.id = dc.countryID WHERE c.active = 1 AND dc.dispatchID = :dispatchID',
                                     ['dispatchID' => $dispatch['id']]);
-                            $countries = \array_map(static function($item) {
-                                return $item['countryiso'];
-                            }, $countries);
                             $this->setDispatch($dispatch['id'], $paymentId);
                             // We might change the shop context here, so we need to initialize it again
-                            $this->get('shopware_storefront.context_service')->initializeShopContext();
+                            $this->get(ContextServiceInterface::class)->initializeShopContext();
                             $basket = $this->getBasket();
                             $this->data['shippingMethods'][] = [
                                 'price'     => \round($basket['sShippingcostsWithTax'],2),
@@ -203,7 +200,7 @@ class Shopware_Controllers_Frontend_IvyProxy extends Shopware_Controllers_Fronte
                 $discountAmount = 0;
                 $basket = $this->getBasket();
                 foreach ($basket['content'] as $item) {
-                    if ((int)$item['modus'] === 2) {
+                    if ((int)$item['modus'] === CartPositionsMode::VOUCHER) {
                         $discountAmount += $item['amountNumeric'];
                     }
                 }
@@ -269,7 +266,7 @@ class Shopware_Controllers_Frontend_IvyProxy extends Shopware_Controllers_Fronte
                     $this->logger->info('set shipping method:  ' . \print_r($shippingMethod, true));
                     $shippingMethodId = $shippingMethod['reference'];
                     $this->setDispatch($shippingMethodId, $paymentId);
-                    $this->get('shopware_storefront.context_service')->initializeShopContext();
+                    $this->get(ContextServiceInterface::class)->initializeShopContext();
                     $this->expressService->validateConfirmPayload($payload, $this->getBasket());
                     $this->logger->info('confrim payload is valid');
                     parent::confirmAction();
@@ -280,7 +277,7 @@ class Shopware_Controllers_Frontend_IvyProxy extends Shopware_Controllers_Fronte
                 }
 
                 $signature = $this->persistBasket();
-                Shopware()->Session()->offsetSet('signature', $signature);
+                Shopware()->Session()->set('signature', $signature);
                 $this->logger->info('redirect to confirm');
                 $this->data = [
                     'redirect' => [

@@ -30,7 +30,9 @@ use Shopware\Models\Customer\Customer;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Encoder\XmlEncoder;
+use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
 use Symfony\Component\Serializer\Serializer;
+use WizmoGmbh\IvyPayment\Exception\IvyApiException;
 
 class ExpressService
 {
@@ -175,7 +177,7 @@ class ExpressService
         $ivyExpressSessionData->setReferenceId($referenceId);
         $ivyExpressSessionData->setExpress(true);
         $ivyExpressSessionData->setMetadata([
-            'sw-context-token' => $session->get('sessionId')
+            'sw-context-token' => $session->getId()
         ]);
 
         // add plugin version as string to know whether to redirect to confirmation page after ivy checkout
@@ -281,7 +283,7 @@ class ExpressService
         Shopware()->Session()->offsetSet('sState', $stateId);
         Shopware()->Session()->offsetSet('sArea', $areaId);
         $this->logger->info('initialize Shop Context');
-        Shopware()->Container()->get('shopware_storefront.context_service')->initializeShopContext();
+        Shopware()->Container()->get(ContextServiceInterface::class)->initializeShopContext();
     }
 
     /**
@@ -329,7 +331,7 @@ class ExpressService
     public function generateSwContextToken()
     {
         $shopID = Shopware()->Shop()->getId();
-        $sessionId = Shopware()->Session()->get('sessionId');
+        $sessionId = Shopware()->Session()->getId();
         $cookies = \json_encode(['session-' . $shopID => $sessionId]);
         $this->logger->debug('generate context token from: ' . $cookies);
         $swContexToken = \base64_encode($cookies);

@@ -7,6 +7,6 @@
         {$theme = 'light'}
     {/if}
     {if $ivyBasket && $ivyBasket.AmountNet}
-        {include file="frontend/ivy_payment_plugin/button.tpl" iviPrice=$ivyBasket.AmountNet theme=$theme}
+        {include file="frontend/ivy_payment_plugin/banner.tpl" iviPrice=$ivyBasket.AmountNet theme=$theme}
     {/if}
 {/block}

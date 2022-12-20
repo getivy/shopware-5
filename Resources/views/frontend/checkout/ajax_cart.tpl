@@ -6,6 +6,7 @@
     {else}
         {$theme = 'light'}
     {/if}
-    {include file="frontend/ivy_payment_plugin/button.tpl" iviPrice=$sBasket.AmountNet theme=$theme}
+    {include file="frontend/ivy_payment_plugin/banner.tpl" iviPrice=$sBasket.AmountNet theme=$theme}
+
     {$smarty.block.parent}
 {/block}

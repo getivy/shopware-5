@@ -33,3 +33,4 @@ There are 2 ways of installing the plugin manually:
 We have a full documentation about the installation, configuration, payment methods as well as troubleshooting and more.
 
 The documentation can be found [here](https://getivy.gitbook.io/integrate-us/integrationen/shopware-5)!
+

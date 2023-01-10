@@ -18,7 +18,7 @@
              data-refresh="{url controller=IvyExpress action=refresh}"
         >
             {$smarty.block.parent}
-            <script src="{$ivyButtonUrl}"></script>
+            <template data-src="{$ivyButtonUrl}"></template>
         </div>
     {else}
         {$smarty.block.parent}

@@ -9,3 +9,4 @@
         data-shop-logo="{link file=$theme.desktopLogo}"
         data-banner-url="{$ivyBannerUrl}"
 ></div>
+<template data-src="{$ivyButtonUrl}">

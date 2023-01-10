@@ -12,6 +12,6 @@
         data-currency-code="{$currency}"
         data-theme = "{$theme}"
     ></div>
-    <script src="{$ivyButtonUrl}"></script>
+    <template data-src="{$ivyButtonUrl}"></template>
 </div>
 {/if}

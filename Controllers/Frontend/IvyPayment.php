@@ -122,6 +122,8 @@ class Shopware_Controllers_Frontend_IvyPayment extends Shopware_Controllers_Fron
                 $this->logger->debug('create new transaction');
                 $transaction = new IvyTransaction();
                 $this->em->persist($transaction);
+                $swContexToken = $this->expressService->generateSwContextToken();
+                $transaction->setSwContextToken($swContexToken);
             }
 
             $transaction->setUpdated(new \DateTime());
@@ -193,36 +195,57 @@ class Shopware_Controllers_Frontend_IvyPayment extends Shopware_Controllers_Fron
                 throw new IvyException('ivy transaction by reference ' . $referenceId . ' not found');
             }
 
-            $orderNumber = (string)$this->saveOrder(
-                $ivyPaymentSession->getIvySessionId(),
-                $referenceId,
-                Status::PAYMENT_STATE_OPEN
-            );
+            $orderNumber = '';
+            //always prefer an existing order
+            if ($ivyPaymentSession->getOrderId()) {
+                try {
+                    $existedOrder = $ivyPaymentSession->getOrder();
+                } catch (\Exception $e) {
+                    $existedOrder = null;
+                }
+                if ($existedOrder instanceof Order) {
+                    $orderNumber = (string)$existedOrder->getNumber();
+                }
+            }
 
             if ($orderNumber === '') {
-                throw new IvyException('can not save order');
-            }
-            $this->logger->info('created  order with number ' . $orderNumber);
+                $orderNumber = (string)$this->saveOrder(
+                    $ivyPaymentSession->getIvySessionId(),
+                    $referenceId,
+                    Status::PAYMENT_STATE_OPEN
+                );
 
-            $order = $this->em->getRepository(Order::class)
-                ->findOneBy(['number' => $orderNumber]);
-            if (!$order instanceof Order) {
-                throw new IvyException('can not load saved order');
-            }
+                if ($orderNumber === '') {
+                    throw new IvyException('can not save order');
+                }
+                $this->logger->info('created order with number ' . $orderNumber);
 
-            $ivyPaymentSession->setStatus(IvyTransaction::PAYMENT_STATUS_PROCESSING);
-            $ivyPaymentSession->setUpdated(new \DateTime());
-            $ivyPaymentSession->setOrder($order);
-            $this->em->flush($ivyPaymentSession);
+                $order = $this->em->getRepository(Order::class)
+                    ->findOneBy(['number' => $orderNumber]);
+                if (!$order instanceof Order) {
+                    throw new IvyException('can not load saved order');
+                }
+
+                $ivyPaymentSession->setStatus(IvyTransaction::PAYMENT_STATUS_PROCESSING);
+                $ivyPaymentSession->setUpdated(new \DateTime());
+                $ivyPaymentSession->setOrder($order);
+                $ivyPaymentSession->setReference($orderNumber);
+                $this->em->flush($ivyPaymentSession);
+            } else {
+                $this->logger->info('order existing: ' . $orderNumber);
+            }
 
             $outputData = [
                 'redirectUrl' => $this->router->assemble(['controller' => 'checkout', 'action' => 'finish']),
+                'displayId' => $orderNumber,
+                'referenceId' => $orderNumber,
                 'metadata' => [
                     '_sw_payment_token' => $signature,
+                    'shopwareOrderId' => $orderNumber
                 ]
             ];
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->logger->error($e->getMessage());
             $this->logger->error($e->getTraceAsString());
             $error = $e->getMessage();
@@ -232,7 +255,7 @@ class Shopware_Controllers_Frontend_IvyPayment extends Shopware_Controllers_Fron
             $outputData['error'] = $error;
         }
 
-        $this->logger->info('send proxy response');
+        $this->logger->info('send proxy response: ' . \print_r($outputData, true));
 
         \ini_set('serialize_precision', '3');
         $response = new IvyJsonResponse($outputData);
@@ -301,7 +324,6 @@ class Shopware_Controllers_Frontend_IvyPayment extends Shopware_Controllers_Fron
             $sOrder->setPaymentStatus($transaction->getOrderId(), $paymentStatus);
         }
 
-        $this->ivyHelper->updateOrder($transaction);
         $this->redirect(['controller' => 'checkout', 'action' => 'finish']);
     }
 
@@ -392,9 +414,6 @@ class Shopware_Controllers_Frontend_IvyPayment extends Shopware_Controllers_Fron
                 $paymentStatus = IvyTransaction::STATUS_MAP[$status] ?: null;
                 if ($paymentStatus) {
                     $sOrder->setPaymentStatus($transaction->getOrderId(), $paymentStatus);
-                }
-                if ($type === 'order_created') {
-                    $this->ivyHelper->updateOrder($transaction);
                 }
                 return new JsonResponse(['success' => true], Response::HTTP_OK);
             }
